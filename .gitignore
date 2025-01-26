@@ -1,0 +1,14 @@
+*.o
+*.so
+*.pyc
+*.pyo
+*~
+*.bak
+*.diff
+.*.swp
+ringfs
+tests/tests
+example
+tags
+html/
+*.sim
