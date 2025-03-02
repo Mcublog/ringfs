@@ -33,9 +33,15 @@ struct flashsim *flashsim_open(const char *name, int size, int sector_size)
 
     sim->size = size;
     sim->sector_size = sector_size;
-    sim->fh = fopen(name, "w+");
-    assert(sim->fh != NULL);
-    assert(ftruncate(fileno(sim->fh), size) == 0);
+
+    sim->fh = fopen(name, "rw");
+    if (sim->fh == NULL)
+    {
+        logprintf("create new file: %s", name);
+        sim->fh = fopen(name, "w+");
+        assert(sim->fh != NULL);
+        assert(ftruncate(fileno(sim->fh), size) == 0);
+    }
 
     return sim;
 }
