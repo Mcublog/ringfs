@@ -23,9 +23,13 @@
 struct flashsim {
     int size;
     int sector_size;
+    const char *name;
 
     FILE *fh;
 };
+
+static const char *kOpenMode = "r+";
+static const char *kCreateMode = "w+";
 
 struct flashsim *flashsim_open(const char *name, int size, int sector_size)
 {
@@ -33,16 +37,17 @@ struct flashsim *flashsim_open(const char *name, int size, int sector_size)
 
     sim->size = size;
     sim->sector_size = sector_size;
+    sim->name = name;
 
-    sim->fh = fopen(name, "rw");
+    sim->fh = fopen(name, kOpenMode);
     if (sim->fh == NULL)
     {
         logprintf("create new file: %s", name);
-        sim->fh = fopen(name, "w+");
+        sim->fh = fopen(name, kCreateMode);
         assert(sim->fh != NULL);
         assert(ftruncate(fileno(sim->fh), size) == 0);
     }
-
+    assert(sim->fh != NULL);
     return sim;
 }
 
@@ -104,6 +109,11 @@ void flashsim_program(struct flashsim *sim, uint32_t addr, const uint8_t *buf, i
 
     assert(fseek(sim->fh, addr, SEEK_SET) == 0);
     assert(fwrite(data, 1, len, sim->fh) == (size_t) len);
+
+    // Need to correct dumping data to file
+    fflush(sim->fh);
+    fclose(sim->fh);
+    sim->fh = fopen(sim->name, kOpenMode);
 
     free(data);
 }
