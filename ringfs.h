@@ -117,7 +117,7 @@ extern "C"
      * @param fs Initialized RingFS instance.
      * @returns Maximum capacity on success, -1 on failure.
      */
-    int ringfs_capacity(struct ringfs *fs);
+    int ringfs_capacity(const struct ringfs *fs);
 
     /**
      * Calculate approximate object count.
@@ -126,7 +126,7 @@ extern "C"
      * @param fs Initialized RingFS instance.
      * @returns Estimated object count on success, -1 on failure.
      */
-    int ringfs_count_estimate(struct ringfs *fs);
+    int ringfs_count_estimate(const struct ringfs *fs);
 
     /**
      * Calculate exact object count.

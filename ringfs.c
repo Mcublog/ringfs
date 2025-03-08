@@ -24,21 +24,19 @@
  * @defgroup sector
  * @{
  */
+#define SECTOR_ERASED     (0xFFFFFFFFU) /**< Default state after NOR flash erase. */
+#define SECTOR_FREE       (0xFFFFFF00U) /**< Sector erased. */
+#define SECTOR_IN_USE     (0xFFFF0000U) /**< Sector contains valid data. */
+#define SECTOR_ERASING    (0xFF000000U) /**< Sector should be erased. */
+#define SECTOR_FORMATTING (0x00000000U) /**< The entire partition is being formatted. */
 
-enum sector_status {
-    SECTOR_ERASED     = 0xFFFFFFFF, /**< Default state after NOR flash erase. */
-    SECTOR_FREE       = 0xFFFFFF00, /**< Sector erased. */
-    SECTOR_IN_USE     = 0xFFFF0000, /**< Sector contains valid data. */
-    SECTOR_ERASING    = 0xFF000000, /**< Sector should be erased. */
-    SECTOR_FORMATTING = 0x00000000, /**< The entire partition is being formatted. */
-};
 
 struct sector_header {
     uint32_t status;
     uint32_t version;
 };
 
-static int _sector_address(struct ringfs *fs, int sector_offset)
+static int _sector_address(const struct ringfs *fs, int sector_offset)
 {
     return (fs->flash->sector_offset + sector_offset) * fs->flash->sector_size;
 }
@@ -70,26 +68,23 @@ static int _sector_free(struct ringfs *fs, int sector)
  * @defgroup slot
  * @{
  */
-
-enum slot_status {
-    SLOT_ERASED   = 0xFFFFFFFF, /**< Default state after NOR flash erase. */
-    SLOT_RESERVED = 0xFFFFFF00, /**< Write started but not yet committed. */
-    SLOT_VALID    = 0xFFFF0000, /**< Write committed, slot contains valid data. */
-    SLOT_GARBAGE  = 0xFF000000, /**< Slot contents discarded and no longer valid. */
-};
+#define SLOT_ERASED   (0xFFFFFFFFU) /**< Default state after NOR flash erase. */
+#define SLOT_RESERVED (0xFFFFFF00U) /**< Write started but not yet committed. */
+#define SLOT_VALID    (0xFFFF0000U) /**< Write committed, slot contains valid data. */
+#define SLOT_GARBAGE  (0xFF000000U) /**< Slot contents discarded and no longer valid. */
 
 struct slot_header {
     uint32_t status;
 };
 
-static int _slot_address(struct ringfs *fs, struct ringfs_loc *loc)
+static int _slot_address(const struct ringfs *fs, const struct ringfs_loc *loc)
 {
     return _sector_address(fs, loc->sector) +
            sizeof(struct sector_header) +
            (sizeof(struct slot_header) + fs->object_size) * loc->slot;
 }
 
-static int _slot_get_status(struct ringfs *fs, struct ringfs_loc *loc, uint32_t *status)
+static int _slot_get_status(const struct ringfs *fs, const struct ringfs_loc *loc, uint32_t *status)
 {
     return fs->flash->read(_slot_address(fs, loc) + offsetof(struct slot_header, status),
             status, sizeof(*status));
@@ -280,12 +275,12 @@ int ringfs_scan(struct ringfs *fs)
     return 0;
 }
 
-int ringfs_capacity(struct ringfs *fs)
+int ringfs_capacity(const struct ringfs *fs)
 {
     return fs->slots_per_sector * (fs->flash->sector_count - 1);
 }
 
-int ringfs_count_estimate(struct ringfs *fs)
+int ringfs_count_estimate(const struct ringfs *fs)
 {
     int sector_diff = (fs->write.sector - fs->read.sector + fs->flash->sector_count) %
         fs->flash->sector_count;
