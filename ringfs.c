@@ -30,6 +30,12 @@
 #define SECTOR_ERASING    (0xFF000000U) /**< Sector should be erased. */
 #define SECTOR_FORMATTING (0x00000000U) /**< The entire partition is being formatted. */
 
+/** Minimum number of sectors required for RingFS to operate safely.
+ * - 1 sector for read head
+ * - 1 sector for write operations
+ * - 1 sector that must always remain FREE (invariant)
+ */
+#define MIN_SECTOR_COUNT 3
 
 struct sector_header {
     uint32_t status;
@@ -132,6 +138,13 @@ static void _loc_advance_slot(struct ringfs *fs, struct ringfs_loc *loc)
 
 int ringfs_init(struct ringfs *fs, const struct ringfs_flash_partition *flash, uint32_t version, int object_size)
 {
+    /* Validate minimum sector count requirement. */
+    if (flash->sector_count < MIN_SECTOR_COUNT) {
+        printf("ringfs_init: error - partition requires at least %d sectors, got %d\n",
+               MIN_SECTOR_COUNT, flash->sector_count);
+        return -1;
+    }
+
     /* Copy arguments to instance. */
     fs->flash = flash;
     fs->version = version;
@@ -277,7 +290,14 @@ int ringfs_scan(struct ringfs *fs)
 
 int ringfs_capacity(const struct ringfs *fs)
 {
-    return fs->slots_per_sector * (fs->flash->sector_count - 1);
+    /* Capacity calculation must account for the invariant:
+     * - One sector must always remain FREE
+     * - One sector is used for write operations
+     * Therefore, maximum usable capacity = (sector_count - 2) * slots_per_sector
+     */
+    if (fs->flash->sector_count < MIN_SECTOR_COUNT)
+        return 0;
+    return fs->slots_per_sector * (fs->flash->sector_count - 2);
 }
 
 int ringfs_count_estimate(const struct ringfs *fs)
