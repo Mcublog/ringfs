@@ -24,34 +24,34 @@ extern "C"
 #endif
 
     /**
-     * Flash memory+parition descriptor.
+     * Дескриптор Flash памяти и раздела.
      */
     typedef struct ringfs_flash_partition
     {
-        int sector_size;   /**< Sector size, in bytes. */
-        int sector_offset; /**< Partition offset, in sectors. */
-        int sector_count;  /**< Partition size, in sectors. */
+        int sector_size;   /**< Размер сектора в байтах. */
+        int sector_offset; /**< Смещение раздела в секторах. */
+        int sector_count;  /**< Размер раздела в секторах. */
 
         /**
-         * Erase a sector.
-         * @param address Any address inside the sector.
-         * @returns Zero on success, -1 on failure.
+         * Стереть сектор.
+         * @param address Любой адрес внутри сектора.
+         * @returns Ноль при успехе, -1 при ошибке.
          */
         int (*sector_erase)(uint32_t address);
         /**
-         * Program flash memory bits by toggling them from 1 to 0.
-         * @param address Start address, in bytes.
-         * @param data Data to program.
-         * @param size Size of data.
-         * @returns size on success, -1 on failure.
+         * Запрограммировать бит Flash памяти (переключение с 1 на 0).
+         * @param address Начальный адрес в байтах.
+         * @param data Данные для записи.
+         * @param size Размер данных.
+         * @returns size при успехе, -1 при ошибке.
          */
         ssize_t (*program)(uint32_t address, const void *data, size_t size);
         /**
-         * Read flash memory.
-         * @param address Start address, in bytes.
-         * @param data Buffer to store read data.
-         * @param size Size of data.
-         * @returns size on success, -1 on failure.
+         * Прочитать Flash память.
+         * @param address Начальный адрес в байтах.
+         * @param data Буфер для хранения прочитанных данных.
+         * @param size Размер данных.
+         * @returns size при успехе, -1 при ошибке.
          */
         ssize_t (*read)(uint32_t address, void *data, size_t size);
     } ringfs_flash_partition_t;
@@ -64,124 +64,124 @@ extern "C"
     } ringfs_loc_t;
 
     /**
-     * RingFS instance. Should be initialized with ringfs_init() befure use.
-     * Structure fields should not be accessed directly.
+     * Экземпляр RingFS. Должен быть инициализирован с помощью ringfs_init() перед использованием.
+     * Поля структуры не должны быть доступны напрямую.
      * */
     typedef struct ringfs
     {
-        /* Constant values, set once at ringfs_init(). */
+        /* Постоянные значения, установленные один раз при ringfs_init(). */
         const struct ringfs_flash_partition *flash;
         uint32_t version;
         int object_size;
-        /* Cached values. */
+        /* Кэшированные значения. */
         int slots_per_sector;
 
-        /* Read/write pointers. Modified as needed. */
+        /* Указатели чтения/записи. Изменяются по мере необходимости. */
         struct ringfs_loc read;
         struct ringfs_loc write;
         struct ringfs_loc cursor;
     } ringfs_t;
     /**
-     * Initialize a RingFS instance. Must be called before the instance can be used
-     * with the other ringfs_* functions.
+     * Инициализировать экземпляр RingFS. Должна быть вызвана перед использованием
+     * экземпляра с другими функциями ringfs_*.
      *
-     * @param fs RingFS instance to be initialized.
-     * @param flash Flash memory interface. Must be implemented externally.
-     * @param version Object version. Should be incremented whenever the object's
-     *                semantics or size change in a backwards-incompatible way.
-     * @param object_size Size of one stored object, in bytes.
-     * @returns Zero on success, -1 on failure.
+     * @param fs Экземпляр RingFS для инициализации.
+     * @param flash Интерфейс Flash памяти. Должен быть реализован внешним образом.
+     * @param version Версия объекта. Должна быть увеличена, когда семантика
+     *                или размер объекта изменяются несовместимым образом.
+     * @param object_size Размер одного сохраняемого объекта в байтах.
+     * @returns Ноль при успехе, -1 при ошибке.
      */
     int ringfs_init(struct ringfs *fs, const struct ringfs_flash_partition *flash,
                     uint32_t version, int object_size);
 
     /**
-     * Format the flash memory.
+     * Отформатировать Flash память.
      *
-     * @param fs Initialized RingFS instance.
-     * @returns Zero on success, -1 on failure.
+     * @param fs Инициализированный экземпляр RingFS.
+     * @returns Ноль при успехе, -1 при ошибке.
      */
     int ringfs_format(struct ringfs *fs);
 
     /**
-     * Scan the flash memory for a valid filesystem.
+     * Просканировать Flash память в поиске валидной файловой системы.
      *
-     * @param fs Initialized RingFS instance.
-     * @returns Zero on success, -1 on failure.
+     * @param fs Инициализированный экземпляр RingFS.
+     * @returns Ноль при успехе, -1 при ошибке.
      */
     int ringfs_scan(struct ringfs *fs);
 
     /**
-     * Calculate maximum RingFS capacity.
+     * Вычислить максимальную ёмкость RingFS.
      *
-     * @param fs Initialized RingFS instance.
-     * @returns Maximum capacity on success, -1 on failure.
+     * @param fs Инициализированный экземпляр RingFS.
+     * @returns Максимальная ёмкость при успехе, -1 при ошибке.
      */
     int ringfs_capacity(const struct ringfs *fs);
 
     /**
-     * Calculate approximate object count.
-     * Runs in O(1).
+     * Вычислить приблизительное количество объектов.
+     * Работает за O(1).
      *
-     * @param fs Initialized RingFS instance.
-     * @returns Estimated object count on success, -1 on failure.
+     * @param fs Инициализированный экземпляр RingFS.
+     * @returns Приблизительное количество объектов при успехе, -1 при ошибке.
      */
     int ringfs_count_estimate(const struct ringfs *fs);
 
     /**
-     * Calculate exact object count.
-     * Runs in O(n).
+     * Вычислить точное количество объектов.
+     * Работает за O(n).
      *
-     * @param fs Initialized RingFS instance.
-     * @returns Exact object count on success, -1 on failure.
+     * @param fs Инициализированный экземпляр RingFS.
+     * @returns Точное количество объектов при успехе, -1 при ошибке.
      */
     int ringfs_count_exact(struct ringfs *fs);
 
     /**
-     * Append an object at the end of the ring. Deletes oldest objects as needed.
+     * Добавить объект в конец кольца. Удаляет самые старые объекты при необходимости.
      *
-     * @param fs Initialized RingFS instance.
-     * @param object Object to be stored.
-     * @returns Zero on success, -1 on failure.
+     * @param fs Инициализированный экземпляр RingFS.
+     * @param object Объект для сохранения.
+     * @returns Ноль при успехе, -1 при ошибке.
      */
     int ringfs_append(struct ringfs *fs, const void *object);
 
     /**
-     * Fetch next object from the ring, oldest-first. Advances read cursor.
+     * Получить следующий объект из кольца, начиная с самого старого. Продвигает курсор чтения.
      *
-     * @param fs Initialized RingFS instance.
-     * @param object Buffer to store retrieved object.
-     * @returns Zero on success, -1 on failure.
+     * @param fs Инициализированный экземпляр RingFS.
+     * @param object Буфер для хранения полученного объекта.
+     * @returns Ноль при успехе, -1 при ошибке.
      */
     int ringfs_fetch(struct ringfs *fs, void *object);
 
     /**
-     * Discard all fetched objects up to the read cursor.
+     * Отбросить все полученные объекты до курсора чтения.
      *
-     * @param fs Initialized RingFS instance.
-     * @returns Zero on success, -1 on failure.
+     * @param fs Инициализированный экземпляр RingFS.
+     * @returns Ноль при успехе, -1 при ошибке.
      */
     int ringfs_discard(struct ringfs *fs);
 
     /**
-     * Rewind the read cursor back to the oldest object.
+     * Вернуть курсор чтения на самый старый объект.
      *
-     * @param fs Initialized RingFS instance.
-     * @returns Zero on success, -1 on failure.
+     * @param fs Инициализированный экземпляр RingFS.
+     * @returns Ноль при успехе, -1 при ошибке.
      */
     int ringfs_rewind(struct ringfs *fs);
 
     /**
-     * Dump filesystem metadata. For debugging purposes.
-     * @param stream File stream to write to.
-     * @param fs Initialized RingFS instance.
+     * Вывести метаданные файловой системы. Для целей отладки.
+     * @param stream Поток файла для записи.
+     * @param fs Инициализированный экземпляр RingFS.
      */
     void ringfs_dump(FILE *stream, struct ringfs *fs);
 
     /**
      * @}
      * @}
- */
+  */
 
 #ifdef __cplusplus
 }
