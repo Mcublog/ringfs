@@ -22,7 +22,9 @@ class FlashSim(object):
 
     def __init__(self, name, size, sector_size):
         self.libflashsim = libflashsim()
-        self.sim = self.libflashsim.flashsim_open(name ,size, sector_size)
+        # Keep the encoded name alive: the C side stores the pointer in sim->name.
+        self._name = name.encode()
+        self.sim = self.libflashsim.flashsim_open(self._name, size, sector_size)
 
     def sector_erase(self, addr):
         self.libflashsim.flashsim_sector_erase(self.sim, addr)

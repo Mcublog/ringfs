@@ -4,7 +4,7 @@
 # the terms of the Do What The Fuck You Want To Public License, Version 2, as
 # published by Sam Hocevar. See the COPYING file for more details.
 
-CFLAGS = -g -Wall -Wextra -Werror -std=c99 -I. -Itests
+CFLAGS = -g -Wall -Wextra -Werror -std=c99 -D_POSIX_C_SOURCE=200809L -fPIC -I. -Itests
 LDLIBS = -lcheck
 
 all: scan-build test example
@@ -16,9 +16,12 @@ unit: tests/tests
 	@echo "+++ Running Check test suite..."
 	tests/tests
 
-fuzz: ringfs.so tests/flashsim.so tests/fuzzer.py
+fuzz: env ringfs.so tests/flashsim.so tests/fuzzer.py
 	@echo "+++ Running fuzzer..."
-	tests/fuzzer.py
+	env/bin/python tests/fuzzer.py
+
+env:
+	python3 -m venv env
 
 scan-build: clean
 	@echo "+++ Running Clang Static Analyzer..."
@@ -31,10 +34,11 @@ clean:
 	$(RM) *.o tests/*.o tests/tests html/ *.sim tags example
 
 %.so: %.o
-	$(LINK.o) -shared $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(LINK.o) -shared $^ $(LOADLIBES) -o $@
 
 ringfs.o: ringfs.c ringfs.h
 
+example: LDLIBS =
 example: example.o ringfs.o tests/flashsim.o
 example.o: example.c ringfs.h tests/flashsim.h
 
@@ -48,4 +52,4 @@ tests/flashsim.o: tests/flashsim.c tests/flashsim.h
 ringfs.so: ringfs.o
 tests/flashsim.so: tests/flashsim.o
 
-.PHONY: all test unit fuzz scan-build clean docs
+.PHONY: all test unit fuzz scan-build clean docs env

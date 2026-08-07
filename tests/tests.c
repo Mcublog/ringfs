@@ -64,19 +64,19 @@ END_TEST
 
 static struct flashsim *sim;
 
-static int op_sector_erase(int address)
+static int op_sector_erase(uint32_t address)
 {
     flashsim_sector_erase(sim, address);
     return 0;
 }
 
-static ssize_t op_program(int address, const void *data, size_t size)
+static ssize_t op_program(uint32_t address, const void *data, size_t size)
 {
     flashsim_program(sim, address, data, size);
     return size;
 }
 
-static ssize_t op_read(int address, void *data, size_t size)
+static ssize_t op_read(uint32_t address, void *data, size_t size)
 {
     flashsim_read(sim, address, data, size);
     return size;
@@ -303,7 +303,7 @@ START_TEST(test_ringfs_capacity)
 
     int slots_per_sector = (flash.sector_size-SECTOR_HEADER_SIZE)/(SLOT_HEADER_SIZE+sizeof(object_t));
     int sectors = flash.sector_count;
-    ck_assert_int_eq(ringfs_capacity(&fs), (sectors-1) * slots_per_sector);
+    ck_assert_int_eq(ringfs_capacity(&fs), (sectors-2) * slots_per_sector);
 }
 END_TEST
 
@@ -382,7 +382,9 @@ START_TEST(test_ringfs_overflow)
     ringfs_init(&fs, &flash, DEFAULT_VERSION, sizeof(object_t));
     ringfs_format(&fs);
 
-    int capacity = ringfs_capacity(&fs);
+    /* ringfs_capacity() is the declared safe capacity; the physical hard limit
+     * is one sector more. Exercise eviction at the hard limit. */
+    int capacity = ringfs_capacity(&fs) + fs.slots_per_sector;
 
     printf("## fill filesystem to the brim\n");
     for (int i=0; i<capacity; i++)

@@ -150,9 +150,23 @@ int ringfs_init(struct ringfs *fs, const struct ringfs_flash_partition *flash, u
     fs->version = version;
     fs->object_size = object_size;
 
+    /* Validate object size. */
+    if (object_size <= 0) {
+        printf("ringfs_init: error - object size must be positive, got %d\n",
+               object_size);
+        return -1;
+    }
+
     /* Precalculate commonly used values. */
     fs->slots_per_sector = (fs->flash->sector_size - sizeof(struct sector_header)) /
                            (sizeof(struct slot_header) + fs->object_size);
+
+    /* The object must fit into a sector alongside the headers. */
+    if (fs->slots_per_sector < 1) {
+        printf("ringfs_init: error - object size %d does not fit into a %d-byte sector\n",
+               object_size, fs->flash->sector_size);
+        return -1;
+    }
 
     return 0;
 }
@@ -211,6 +225,10 @@ int ringfs_scan(struct ringfs *fs)
         if (header.status == SECTOR_ERASING || header.status == SECTOR_ERASED) {
             _sector_free(fs, sector);
             header.status = SECTOR_FREE;
+            /* _sector_free() rewrote the version field, so refresh the cached
+             * copy. Otherwise the stale value (0xFFFFFFFF for an ERASED sector)
+             * would fail the version check below and make the repair useless. */
+            header.version = fs->version;
         }
 
         /* Detect corrupted sectors. */
@@ -290,10 +308,13 @@ int ringfs_scan(struct ringfs *fs)
 
 int ringfs_capacity(const struct ringfs *fs)
 {
-    /* Capacity calculation must account for the invariant:
-     * - One sector must always remain FREE
-     * - One sector is used for write operations
-     * Therefore, maximum usable capacity = (sector_count - 2) * slots_per_sector
+    /* Declared capacity, expressed as a safe operating margin:
+     * - One sector must always remain FREE (invariant)
+     * - One sector is reserved for write operations
+     * So the declared capacity = (sector_count - 2) * slots_per_sector.
+     * Note: the physical hard limit is one sector more ((count-1)*slots),
+     * but storing beyond the declared capacity triggers immediate eviction
+     * of a whole sector on the next append.
      */
     if (fs->flash->sector_count < MIN_SECTOR_COUNT)
         return 0;

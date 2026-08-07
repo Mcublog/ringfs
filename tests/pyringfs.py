@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-import sys
+import ctypes
 from sharedlibrary import GenericLibrary
 from ctypes import *
 
@@ -88,7 +88,8 @@ class RingFS(object):
         self.libringfs = libringfs()
         self.ringfs = StructRingFS()
         self.flash = flash.struct
-        self.libringfs.ringfs_init(byref(self.ringfs), byref(self.flash), version, object_size)
+        if self.libringfs.ringfs_init(byref(self.ringfs), byref(self.flash), version, object_size) != 0:
+            raise RuntimeError("ringfs_init() failed")
         self.object_size = object_size
 
     def format(self):
@@ -111,7 +112,7 @@ class RingFS(object):
 
     def fetch(self):
         obj = create_string_buffer(self.object_size)
-        self.libringfs.ringfs_append(byref(self.ringfs), obj)
+        self.libringfs.ringfs_fetch(byref(self.ringfs), obj)
         return obj.raw
 
     def discard(self):
@@ -121,11 +122,10 @@ class RingFS(object):
         self.libringfs.ringfs_rewind(byref(self.ringfs))
 
     def dump(self):
-        import ctypes
-        ctypes.pythonapi.PyFile_AsFile.argtypes= [ ctypes.py_object ]
-        ctypes.pythonapi.PyFile_AsFile.restype= ctypes.c_void_p
-        cstdout = ctypes.pythonapi.PyFile_AsFile(sys.stdout)
-        self.libringfs.ringfs_dump(cstdout, byref(self.ringfs))
+        # Python 3 removed PyFile_AsFile; grab the C "stdout" FILE* instead.
+        libc = ctypes.CDLL(None)
+        c_stdout = ctypes.c_void_p.in_dll(libc, "stdout")
+        self.libringfs.ringfs_dump(c_stdout, byref(self.ringfs))
 
 __all__ = [
     'StructRingFSFlashPartition',
