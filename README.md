@@ -1,55 +1,101 @@
-# RingFS, a small Flash-based ring buffer.
+# RingFS, небольшой Flash-кольцевой буфер.
 
-RingFS is a persistent, Flash-based ring buffer designed for embedded software.
-It's aimed at storing non-critical data that can be expunged on the FIFO basis
-as needed. Typical uses include:
+RingFS — это энергонезависимый кольцевой буфер на основе Flash, разработанный
+для встраиваемых систем. Предназначен для хранения некритичных данных, которые
+могут удаляться по принципу FIFO по мере необходимости. Типичные применения:
 
-* telemetry data,
-* debug logs,
-* stack traces.
+* телеметрия,
+* отладочные журналы,
+* трассировки стека.
 
-RingFS has been designed to run on NOR Flash memory, which exhibits the following
-semantics:
+RingFS спроектирован для работы с NOR Flash, которая обладает следующей
+семантикой:
 
-1. Bits are programmed by flipping them from 1 to 0 with byte granularity.
-2. Bits are erased by flipping them from 0 to 1 with sector granularity.
+1. Программирование битов выполняется их переключением с 1 на 0 с побайтовой
+   гранулярностью.
+2. Стирание битов выполняется их переключением с 0 на 1 с гранулярностью
+   сектора.
 
-## Features
+## Возможности
 
-* Designed and optimized for NOR Flash memory.
-* Stores fixed-size objects in a FIFO buffer.
-* Written in ISO C99.
-* No dynamic memory allocation.
-* Basic robustness features for error recovery.
+* Спроектирован и оптимизирован для NOR Flash.
+* Хранит объекты фиксированного размера в буфере FIFO.
+* Написан на ISO C99.
+* Без динамического выделения памяти.
+* Базовые механизмы устойчивости к сбоям для восстановления после ошибок.
 
-## Usage
+## Использование
 
-1. Add ``ringfs.c`` and ``ringfs.h`` to your project.
-2. Implement the required Flash ops (``sector_erase``, ``program``, ``read``).
-3. Glue your Flash ops with ringfs using ``struct ringfs_flash_partition``.
+1. Добавьте `ringfs.c` и `ringfs.h` в свой проект.
+2. Реализуйте требуемые операции с Flash (`sector_erase`, `program`, `read`).
+3. Подключите свои операции с Flash к ringfs через
+   `struct ringfs_flash_partition`.
 
-See ``example.c`` if this sounds complicated.
+Смотрите `example.c`, если это кажется сложным.
 
-## Documentation
+## Тестирование
 
-See Doxygen-generated documentation at http://cloudyourcar.github.io/ringfs/.
+Проект поставляется с двумя уровнями тестов:
 
-## Non-Features
+* **Модульные тесты** (`tests/tests.c`, фреймворк Check). Покрывают
+  flash-симулятор и RingFS на маленьком разделе (6 секторов по 32 байта,
+  3 слота на сектор), специально подобранном для частых переносов кольца:
+  форматирование, сканирование, добавление, сброс (discard), ёмкость,
+  подсчёт объектов, переполнение с вытеснением. Запуск: `make unit`
+  (требуется libcheck).
+* **Фаззер** (`tests/fuzzer.py`, Python 3). Через ctypes-привязки
+  (`tests/pyringfs.py`, `tests/pyflashsim.py`) загружает собранные `.so`
+  и случайную геометрию раздела, выполняет 1000 случайных операций
+  (append/fetch/rewind/discard в пропорции 100:100:10:10) и после каждой
+  операции сверяет позиции read/write-голов с заново просканированным
+  свежим экземпляром. Запуск: `make fuzz` (само создаёт виртуальное
+  окружение в `env/`).
 
-The ring buffer has been designed to be as simple as possible. Therefore, the
-following are non-features that will *not* be implemented:
+Также доступны `make all` — сборка `example` и прогон обоих уровней тестов,
+и `make scan-build` — статический анализ Clang.
 
-* Variable object sizes (makes things much more complicated).
-* Complicated error recovery (we can lose data in edge cases).
-* Upgrades (complex, also unnecessary in our use cases).
+## Документация
 
-Actually, on the second thought, I may consider adding support for variable
-object sizes some day.
+Смотрите документацию, сгенерированную Doxygen, по адресу
+http://cloudyourcar.github.io/ringfs/.
 
-## License
+## Что не реализовано
+
+Кольцевой буфер спроектирован максимально простым. Поэтому следующие функции
+не реализованы и не будут добавляться:
+
+* Переменный размер объектов (сильно усложняет реализацию).
+* Сложное восстановление после ошибок (в крайних случаях возможна потеря
+  данных).
+* Обновления (сложно и не нужно в наших сценариях использования).
+
+## Ограничения
+
+Следует учитывать следующие ограничения реализации:
+
+* Нет динамического выравнивания износа (wear leveling): износ распределяется
+  по кольцу хронологически и в установившемся режиме выравнивается сам,
+  но не контролируется — нет учёта циклов стирания и ремаппинга,
+  поэтому неравномерная нагрузка может концентрировать износ.
+* Нет контрольных сумм для данных объектов — обнаруживаются только биты
+  состояния (status-биты), побитовые ошибки в полезной нагрузке не выявляются.
+* Сбой питания в процессе `ringfs_append`, `ringfs_discard` или
+  `ringfs_format` может привести к потере данных — это заявленное поведение.
+* Прерванное форматирование (`ringfs_format`) оставляет раздел в состоянии,
+  требующем повторного форматирования.
+* Восстановление после сбоя ограничено: частично затёртые секторы чинятся при
+  сканировании, однако часть состояний требует ручного форматирования.
+* On-flash формат зависит от порядка байт (endianness) платформы, на которой
+  выполняются операции.
+* Библиотека использует `printf` для сообщений об ошибках — на целевой
+  платформе это нужно учитывать.
+* Нет поддержки многопоточности: операции не используют блокировки и
+  предполагают единственного писателя и единственного читателя.
+
+## Лицензия
 
 > Copyright © 2014 Kosma Moczek \<kosma@cloudyourcar.com\>
-> 
+>
 > This program is free software. It comes without any warranty, to the extent
 > permitted by applicable law. You can redistribute it and/or modify it under
 > the terms of the Do What The Fuck You Want To Public License, Version 2, as

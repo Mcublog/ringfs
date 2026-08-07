@@ -1,28 +1,32 @@
-# RingFS changelog
+# Журнал изменений RingFS
 
-## 0.2.1, unreleased
+## 0.2.1, не выпущено
 
-* BUGFIX: ringfs_scan() now refreshes the cached sector version after repairing
-  a partially-erased sector. Previously the stale value (0xFFFFFFFF) failed the
-  version check, making the recovery path useless.
-* BUGFIX: ringfs_init() rejects non-positive object sizes and objects that do
-  not fit into a sector alongside the headers.
-* Capacity semantics aligned: ringfs_capacity() returns the declared safe
-  capacity ((sector_count - 2) * slots_per_sector); the C tests were updated to
-  match and the overflow test now exercises eviction at the hard limit.
-* Python test bindings ported to Python 3. Fixed RingFS.fetch() which wrongly
-  called ringfs_append() instead of ringfs_fetch(); fuzzer now actually reads
-  data. Fuzzer generates partitions with at least MIN_SECTOR_COUNT (3) sectors.
-* Fuzzer runs in a dedicated virtualenv (env/).
+* BUGFIX: ringfs_scan() теперь обновляет кэшированную версию сектора после
+  восстановления частично затёртого сектора. Ранее устаревшее значение
+  (0xFFFFFFFF) не проходило проверку версии, из-за чего восстановление не
+  работало.
+* BUGFIX: ringfs_init() отклоняет неположительные размеры объектов и объекты,
+  которые не помещаются в сектор вместе с заголовками.
+* Семантика ёмкости приведена в соответствие: ringfs_capacity() возвращает
+  заявленную безопасную ёмкость ((sector_count - 2) * slots_per_sector);
+  C-тесты обновлены, а тест переполнения теперь проверяет вытеснение на
+  жёстком пределе.
+* Привязки для Python портированы на Python 3. Исправлен RingFS.fetch(),
+  который ошибочно вызывал ringfs_append() вместо ringfs_fetch(); теперь
+  фаззер действительно читает данные. Фаззер генерирует разделы как минимум
+  с MIN_SECTOR_COUNT (3) секторами.
+* Фаззер запускается в отдельном виртуальном окружении (env/).
 
-## 0.2.0, released 2014/05/07
+## 0.2.0, выпущено 2014/05/07
 
-* BUGFIX: used_seen was not updated in ringfs_scan(), causing corruption.
-* Improved tests.
-* Basic Python bindings.
-* Basic fuzzing support.
+* BUGFIX: в ringfs_scan() не обновлялся флаг used_seen, что вызывало
+  повреждение данных.
+* Улучшены тесты.
+* Базовые привязки для Python.
+* Базовая поддержка фаззинга.
 
-## 0.1.0, released 2014/04/28
+## 0.1.0, выпущено 2014/04/28
 
-First "full" release. Entire API is implemented but subject to change.
-Tests cover most common cases.
+Первый «полный» релиз. Весь API реализован, но может быть изменён.
+Тесты покрывают большинство типовых случаев.
