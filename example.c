@@ -13,7 +13,7 @@
 #include "flashsim.h"
 
 
-/* Flash implementation & ops. */
+/* Реализация и операции с flash. */
 
 #define FLASH_SECTOR_SIZE       1024
 #define FLASH_TOTAL_SECTORS     16
@@ -58,7 +58,7 @@ static struct ringfs_flash_partition flash = {
 };
 
 
-/* Data record format. */
+/* Формат записи данных. */
 struct log_entry {
     int level;
     char message[16];
@@ -66,17 +66,17 @@ struct log_entry {
 #define LOG_ENTRY_VERSION 1
 
 
-/* Let's roll! */
+/* Поехали! */
 int main()
 {
-    /* Initialize your Flash driver before using the filesystem. */
+    /* Инициализируйте драйвер flash до использования файловой системы. */
     init_flash_driver();
 
-    /* Always call ringfs_init first. */
+    /* Всегда вызывайте ringfs_init первым. */
     struct ringfs fs;
     ringfs_init(&fs, &flash, LOG_ENTRY_VERSION, sizeof(struct log_entry));
 
-    /* Scan and/or format before any data operations. */
+    /* Просканируйте и/или отформатируйте до любых операций с данными. */
     printf("# scanning for filesystem...\n");
     if (ringfs_scan(&fs) == 0) {
         printf("# found existing filesystem, usage: %d/%d\n",
@@ -87,7 +87,8 @@ int main()
         ringfs_format(&fs);
     }
 
-    /* Append data using ringfs_append. Oldest data is removed as needed. */
+    /* Добавление данных через ringfs_append. Самые старые данные удаляются
+     * по мере необходимости. */
     printf("# inserting some objects\n");
     ringfs_append(&fs, &(struct log_entry) { 1, "foo" });
     ringfs_append(&fs, &(struct log_entry) { 2, "bar" });
@@ -96,10 +97,10 @@ int main()
     ringfs_append(&fs, &(struct log_entry) { 5, "test" });
     ringfs_append(&fs, &(struct log_entry) { 6, "hello" });
 
-    /* Objects are retrieved using ringfs_fetch. They are not physically removed
-     * until you call ringfs_discard. This is useful, for example, when transmitting
-     * queued objects over the network: you don't physically remove the objects
-     * from the ring buffer until you receive an ACK. */
+    /* Объекты извлекаются через ringfs_fetch. Физически они не удаляются, пока
+     * не будет вызван ringfs_discard. Это полезно, например, при передаче
+     * объектов по сети: они не удаляются из кольцевого буфера, пока не получено
+     * подтверждение (ACK). */
     printf("# reading 2 objects\n");
     for (int i=0; i<2; i++) {
         struct log_entry entry;
@@ -109,8 +110,8 @@ int main()
     printf("# discarding read objects\n");
     ringfs_discard(&fs);
 
-    /* If you decide you can't remove the objects yet, just call ringfs_rewind() and
-     * they will be available again for subsequent reads. */
+    /* Если вы решили, что пока не можете удалить объекты, просто вызовите
+     * ringfs_rewind() — они снова станут доступны для последующих чтений. */
     printf("# reading 2 objects\n");
     for (int i=0; i<2; i++) {
         struct log_entry entry;
@@ -120,7 +121,7 @@ int main()
     printf("# rewinding read head back\n");
     ringfs_rewind(&fs);
 
-    /* ...and here they are again. */
+    /* ...и вот они снова. */
     printf("# reading 2 objects\n");
     for (int i=0; i<2; i++) {
         struct log_entry entry;

@@ -22,7 +22,7 @@ class FlashSim(object):
 
     def __init__(self, name, size, sector_size):
         self.libflashsim = libflashsim()
-        # Keep the encoded name alive: the C side stores the pointer in sim->name.
+        # Сохраняем закодированное имя: C-сторона хранит указатель в sim->name.
         self._name = name.encode()
         self.sim = self.libflashsim.flashsim_open(self._name, size, sector_size)
 

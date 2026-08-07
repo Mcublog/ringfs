@@ -21,9 +21,10 @@ class FuzzRun(object):
         print("FuzzRun[%s]: v=%08x os=%d ss=%d ts=%d so=%d sc=%d" % (name, version, object_size, sector_size,
                 total_sectors, sector_offset, sector_count))
 
-        # flashsim_open() reuses an existing file without resizing it; a stale
-        # file from a previous (different-geometry) run would cause reads/writes
-        # past EOF. Always start from a blank, correctly-sized flash.
+        # flashsim_open() переиспользует существующий файл без изменения его
+        # размера; устаревший файл от предыдущего (с другой геометрией) прогона
+        # привёл бы к чтению/записи за пределами EOF. Всегда начинаем с пустой
+        # flash правильного размера.
         try:
             os.remove(name)
         except OSError:
@@ -92,8 +93,8 @@ total_sectors = random.randint(3, 8)
 sector_offset = random.randint(0, total_sectors-3)
 sector_count = random.randint(3, total_sectors-sector_offset)
 version = random.randint(0, 0xffffffff)
-# object_size must leave room for the sector+slot headers in a single slot:
-# slots_per_sector = (sector_size-8)/(object_size+4) >= 1
+# object_size должен оставлять место для заголовков сектора и слота в одном
+# слоте: slots_per_sector = (sector_size-8)/(object_size+4) >= 1
 object_size = random.randint(1, sector_size-12)
 
 f = FuzzRun('tests/fuzzer.sim', version, object_size, sector_size, total_sectors, sector_offset, sector_count)

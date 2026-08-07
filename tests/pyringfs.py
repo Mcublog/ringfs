@@ -122,7 +122,8 @@ class RingFS(object):
         self.libringfs.ringfs_rewind(byref(self.ringfs))
 
     def dump(self):
-        # Python 3 removed PyFile_AsFile; grab the C "stdout" FILE* instead.
+        # Python 3 убрал PyFile_AsFile; вместо этого берём C-указатель FILE*
+        # на "stdout".
         libc = ctypes.CDLL(None)
         c_stdout = ctypes.c_void_p.in_dll(libc, "stdout")
         self.libringfs.ringfs_dump(c_stdout, byref(self.ringfs))

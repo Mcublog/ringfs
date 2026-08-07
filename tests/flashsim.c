@@ -110,7 +110,7 @@ void flashsim_program(struct flashsim *sim, uint32_t addr, const uint8_t *buf, i
     assert(fseek(sim->fh, addr, SEEK_SET) == 0);
     assert(fwrite(data, 1, len, sim->fh) == (size_t) len);
 
-    // Need to correct dumping data to file
+    /* Нужно корректно сбросить данные в файл */
     fflush(sim->fh);
     fclose(sim->fh);
     sim->fh = fopen(sim->name, kOpenMode);

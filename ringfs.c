@@ -7,7 +7,7 @@
  */
 
 /**
- * @defgroup ringfs_impl RingFS implementation
+ * @defgroup ringfs_impl Реализация RingFS
  * @details
  *
  * @{
@@ -24,16 +24,16 @@
  * @defgroup sector
  * @{
  */
-#define SECTOR_ERASED     (0xFFFFFFFFU) /**< Default state after NOR flash erase. */
-#define SECTOR_FREE       (0xFFFFFF00U) /**< Sector erased. */
-#define SECTOR_IN_USE     (0xFFFF0000U) /**< Sector contains valid data. */
-#define SECTOR_ERASING    (0xFF000000U) /**< Sector should be erased. */
-#define SECTOR_FORMATTING (0x00000000U) /**< The entire partition is being formatted. */
+#define SECTOR_ERASED     (0xFFFFFFFFU) /**< Состояние по умолчанию после стирания NOR flash. */
+#define SECTOR_FREE       (0xFFFFFF00U) /**< Сектор затёрт и помечен свободным. */
+#define SECTOR_IN_USE     (0xFFFF0000U) /**< Сектор содержит актуальные данные. */
+#define SECTOR_ERASING    (0xFF000000U) /**< Сектор помечен к стиранию. */
+#define SECTOR_FORMATTING (0x00000000U) /**< Форматируется весь раздел. */
 
-/** Minimum number of sectors required for RingFS to operate safely.
- * - 1 sector for read head
- * - 1 sector for write operations
- * - 1 sector that must always remain FREE (invariant)
+/** Минимальное число секторов, необходимое для безопасной работы RingFS.
+ * - 1 сектор для головки чтения
+ * - 1 сектор для операций записи
+ * - 1 сектор, который всегда должен оставаться свободным (FREE, инвариант)
  */
 #define MIN_SECTOR_COUNT 3
 
@@ -74,10 +74,10 @@ static int _sector_free(struct ringfs *fs, int sector)
  * @defgroup slot
  * @{
  */
-#define SLOT_ERASED   (0xFFFFFFFFU) /**< Default state after NOR flash erase. */
-#define SLOT_RESERVED (0xFFFFFF00U) /**< Write started but not yet committed. */
-#define SLOT_VALID    (0xFFFF0000U) /**< Write committed, slot contains valid data. */
-#define SLOT_GARBAGE  (0xFF000000U) /**< Slot contents discarded and no longer valid. */
+#define SLOT_ERASED   (0xFFFFFFFFU) /**< Состояние по умолчанию после стирания NOR flash. */
+#define SLOT_RESERVED (0xFFFFFF00U) /**< Запись начата, но ещё не завершена. */
+#define SLOT_VALID    (0xFFFF0000U) /**< Запись завершена, слот содержит актуальные данные. */
+#define SLOT_GARBAGE  (0xFF000000U) /**< Содержимое слота отброшено и более не актуально. */
 
 struct slot_header {
     uint32_t status;
@@ -113,7 +113,7 @@ static bool _loc_equal(struct ringfs_loc *a, struct ringfs_loc *b)
     return (a->sector == b->sector) && (a->slot == b->slot);
 }
 
-/** Advance a location to the beginning of the next sector. */
+/** Перемещает позицию к началу следующего сектора. */
 static void _loc_advance_sector(struct ringfs *fs, struct ringfs_loc *loc)
 {
     loc->slot = 0;
@@ -122,7 +122,7 @@ static void _loc_advance_sector(struct ringfs *fs, struct ringfs_loc *loc)
         loc->sector = 0;
 }
 
-/** Advance a location to the next slot, advancing the sector too if needed. */
+/** Перемещает позицию к следующему слоту, при необходимости переходя к следующему сектору. */
 static void _loc_advance_slot(struct ringfs *fs, struct ringfs_loc *loc)
 {
     loc->slot++;
@@ -134,34 +134,34 @@ static void _loc_advance_slot(struct ringfs *fs, struct ringfs_loc *loc)
  * @}
  */
 
-/* And here we go. */
+/* Поехали. */
 
 int ringfs_init(struct ringfs *fs, const struct ringfs_flash_partition *flash, uint32_t version, int object_size)
 {
-    /* Validate minimum sector count requirement. */
+    /* Проверка минимального количества секторов. */
     if (flash->sector_count < MIN_SECTOR_COUNT) {
         printf("ringfs_init: error - partition requires at least %d sectors, got %d\n",
                MIN_SECTOR_COUNT, flash->sector_count);
         return -1;
     }
 
-    /* Copy arguments to instance. */
+    /* Копирование аргументов в экземпляр. */
     fs->flash = flash;
     fs->version = version;
     fs->object_size = object_size;
 
-    /* Validate object size. */
+    /* Проверка размера объекта. */
     if (object_size <= 0) {
         printf("ringfs_init: error - object size must be positive, got %d\n",
                object_size);
         return -1;
     }
 
-    /* Precalculate commonly used values. */
+    /* Предвычисление часто используемых значений. */
     fs->slots_per_sector = (fs->flash->sector_size - sizeof(struct sector_header)) /
                            (sizeof(struct slot_header) + fs->object_size);
 
-    /* The object must fit into a sector alongside the headers. */
+    /* Объект должен помещаться в сектор вместе с заголовками. */
     if (fs->slots_per_sector < 1) {
         printf("ringfs_init: error - object size %d does not fit into a %d-byte sector\n",
                object_size, fs->flash->sector_size);
@@ -173,15 +173,15 @@ int ringfs_init(struct ringfs *fs, const struct ringfs_flash_partition *flash, u
 
 int ringfs_format(struct ringfs *fs)
 {
-    /* Mark all sectors to prevent half-erased filesystems. */
+    /* Пометить все секторы, чтобы предотвратить частично отформатированные ФС. */
     for (int sector=0; sector<fs->flash->sector_count; sector++)
         _sector_set_status(fs, sector, SECTOR_FORMATTING);
 
-    /* Erase, update version, mark as free. */
+    /* Стереть, обновить версию, пометить как свободный. */
     for (int sector=0; sector<fs->flash->sector_count; sector++)
         _sector_free(fs, sector);
 
-    /* Start reading & writing at the first sector. */
+    /* Начать чтение и запись с первого сектора. */
     fs->read.sector = 0;
     fs->read.slot = 0;
     fs->write.sector = 0;
@@ -195,65 +195,66 @@ int ringfs_format(struct ringfs *fs)
 int ringfs_scan(struct ringfs *fs)
 {
     uint32_t previous_sector_status = SECTOR_FREE;
-    /* The read sector is the first IN_USE sector *after* a FREE sector
-     * (or the first one). */
+    /* Сектор чтения — первый сектор IN_USE *после* сектора FREE
+     * (или первый вообще). */
     int read_sector = 0;
-    /* The write sector is the last IN_USE sector *before* a FREE sector
-     * (or the last one). */
+    /* Сектор записи — последний сектор IN_USE *перед* сектором FREE
+     * (или последний вообще). */
     int write_sector = fs->flash->sector_count - 1;
-    /* There must be at least one FREE sector available at all times. */
+    /* В любой момент должен быть хотя бы один сектор FREE. */
     bool free_seen = false;
-    /* If there's no IN_USE sector, we start at the first one. */
+    /* Если нет ни одного сектора IN_USE, начинаем с первого. */
     bool used_seen = false;
 
-    /* Iterate over sectors. */
+    /* Перебор секторов. */
     for (int sector=0; sector<fs->flash->sector_count; sector++) {
         int addr = _sector_address(fs, sector);
 
-        /* Read sector header. */
+        /* Чтение заголовка сектора. */
         struct sector_header header = {0};
         fs->flash->read(addr, &header, sizeof(header));
 
-        /* Detect partially-formatted partitions. */
+        /* Обнаружение частично отформатированных разделов. */
         if (header.status == SECTOR_FORMATTING) {
             printf("ringfs_scan: sector: %d addr: %d\r\n", sector, addr);
             printf("ringfs_scan: partially formatted partition\r\n");
             return -1;
         }
 
-        /* Detect and fix partially erased sectors. */
+        /* Обнаружение и починка частично затёртых секторов. */
         if (header.status == SECTOR_ERASING || header.status == SECTOR_ERASED) {
             _sector_free(fs, sector);
             header.status = SECTOR_FREE;
-            /* _sector_free() rewrote the version field, so refresh the cached
-             * copy. Otherwise the stale value (0xFFFFFFFF for an ERASED sector)
-             * would fail the version check below and make the repair useless. */
+            /* _sector_free() перезаписал поле версии, поэтому обновляем
+             * кэшированную копию. Иначе устаревшее значение (0xFFFFFFFF для
+             * затёртого сектора) не прошло бы проверку версии ниже и сделало
+             * бы починку бесполезной. */
             header.version = fs->version;
         }
 
-        /* Detect corrupted sectors. */
+        /* Обнаружение повреждённых секторов. */
         if (header.status != SECTOR_FREE && header.status != SECTOR_IN_USE) {
             printf("ringfs_scan: corrupted sector %d\r\n", sector);
             return -1;
         }
 
-        /* Detect obsolete versions. We can't do this earlier because the version
-         * could have been invalid due to a partial erase. */
+        /* Обнаружение устаревших версий. Нельзя сделать это раньше, потому что
+         * версия могла быть некорректной из-за частичного стирания. */
         if (header.version != fs->version) {
             printf("ringfs_scan: sector: %d addr: %d\r\n", sector, addr);
             printf("ringfs_scan: incompatible version 0x%08"PRIx32"\r\n", header.version);
             return -1;
         }
 
-        /* Record the presence of a FREE sector. */
+        /* Отметить наличие сектора FREE. */
         if (header.status == SECTOR_FREE)
             free_seen = true;
 
-        /* Record the presence of a IN_USE sector. */
+        /* Отметить наличие сектора IN_USE. */
         if (header.status == SECTOR_IN_USE)
             used_seen = true;
 
-        /* Update read & write sectors according to the above rules. */
+        /* Обновить секторы чтения и записи по указанным выше правилам. */
         if (header.status == SECTOR_IN_USE && previous_sector_status == SECTOR_FREE)
             read_sector = sector;
         if (header.status == SECTOR_FREE && previous_sector_status == SECTOR_IN_USE)
@@ -262,18 +263,18 @@ int ringfs_scan(struct ringfs *fs)
         previous_sector_status = header.status;
     }
 
-    /* Detect the lack of a FREE sector. */
+    /* Обнаружение отсутствия сектора FREE. */
     if (!free_seen) {
         printf("ringfs_scan: invariant violated: no FREE sector found\r\n");
         return -1;
     }
 
-    /* Start writing at the first sector if the filesystem is empty. */
+    /* Начать запись с первого сектора, если ФС пуста. */
     if (!used_seen) {
         write_sector = 0;
     }
 
-    /* Scan the write sector and skip all occupied slots at the beginning. */
+    /* Просканировать сектор записи, пропуская занятые слоты в начале. */
     fs->write.sector = write_sector;
     fs->write.slot = 0;
     while (fs->write.sector == write_sector) {
@@ -284,11 +285,11 @@ int ringfs_scan(struct ringfs *fs)
 
         _loc_advance_slot(fs, &fs->write);
     }
-    /* If the sector was full, we're at the beginning of a FREE sector now. */
+    /* Если сектор был полон, теперь мы в начале сектора FREE. */
 
-    /* Position the read head at the start of the first IN_USE sector, then skip
-     * over garbage/invalid slots until something of value is found or we reach
-     * the write head which means there's no data. */
+    /* Поместить головку чтения в начало первого сектора IN_USE, затем
+     * пропустить мусорные/некорректные слоты, пока не найдётся что-то полезное
+     * или мы не достигнем головки записи — значит, данных нет. */
     fs->read.sector = read_sector;
     fs->read.slot = 0;
     while (!_loc_equal(&fs->read, &fs->write)) {
@@ -300,7 +301,7 @@ int ringfs_scan(struct ringfs *fs)
         _loc_advance_slot(fs, &fs->read);
     }
 
-    /* Move the read cursor to the read head position. */
+    /* Переместить курсор чтения на позицию головки чтения. */
     fs->cursor = fs->read;
 
     return 0;
@@ -308,13 +309,13 @@ int ringfs_scan(struct ringfs *fs)
 
 int ringfs_capacity(const struct ringfs *fs)
 {
-    /* Declared capacity, expressed as a safe operating margin:
-     * - One sector must always remain FREE (invariant)
-     * - One sector is reserved for write operations
-     * So the declared capacity = (sector_count - 2) * slots_per_sector.
-     * Note: the physical hard limit is one sector more ((count-1)*slots),
-     * but storing beyond the declared capacity triggers immediate eviction
-     * of a whole sector on the next append.
+    /* Объявленная ёмкость как безопасный рабочий запас:
+     * - один сектор всегда должен оставаться FREE (инвариант);
+     * - один сектор зарезервирован для операций записи.
+     * Поэтому объявленная ёмкость = (sector_count - 2) * slots_per_sector.
+     * Примечание: физический жёсткий предел на один сектор больше
+     * ((count-1)*slots), но хранение сверх объявленной ёмкости при следующем
+     * append вызывает немедленное вытеснение целого сектора.
      */
     if (fs->flash->sector_count < MIN_SECTOR_COUNT)
         return 0;
@@ -333,7 +334,7 @@ int ringfs_count_exact(struct ringfs *fs)
 {
     int count = 0;
 
-    /* Use a temporary loc for iteration. */
+    /* Использовать временную позицию для перебора. */
     struct ringfs_loc loc = fs->read;
     while (!_loc_equal(&loc, &fs->write)) {
         uint32_t status;
@@ -353,49 +354,50 @@ int ringfs_append(struct ringfs *fs, const void *object)
     uint32_t status;
 
     /*
-     * There are three sectors involved in appending a value:
-     * - the sector where the append happens: it has to be writable
-     * - the next sector: it must be free (invariant)
-     * - the next-next sector: read & cursor heads are moved there if needed
+     * В добавлении объекта участвуют три сектора:
+     * - сектор, в который выполняется добавление: должен быть записываемым;
+     * - следующий сектор: должен быть свободным (FREE, инвариант);
+     * - при вытеснении следующего сектора головки чтения и курсора
+     *   при необходимости передвигаются вперёд.
      */
 
-    /* Make sure the next sector is free. */
+    /* Убедиться, что следующий сектор свободен. */
     int next_sector = (fs->write.sector+1) % fs->flash->sector_count;
     _sector_get_status(fs, next_sector, &status);
     if (status != SECTOR_FREE) {
-        /* Next sector must be freed. But first... */
+        /* Следующий сектор нужно освободить. Но сначала... */
 
-        /* Move the read & cursor heads out of the way. */
+        /* Убрать головки чтения и курсора с пути. */
         if (fs->read.sector == next_sector)
             _loc_advance_sector(fs, &fs->read);
         if (fs->cursor.sector == next_sector)
             _loc_advance_sector(fs, &fs->cursor);
 
-        /* Free the next sector. */
+        /* Освободить следующий сектор. */
         _sector_free(fs, next_sector);
     }
 
-    /* Now we can make sure the current write sector is writable. */
+    /* Теперь убедимся, что текущий сектор записи доступен для записи. */
     _sector_get_status(fs, fs->write.sector, &status);
     if (status == SECTOR_FREE) {
-        /* Free sector. Mark as used. */
+        /* Свободный сектор. Пометить как используемый. */
         _sector_set_status(fs, fs->write.sector, SECTOR_IN_USE);
     } else if (status != SECTOR_IN_USE) {
         printf("ringfs_append: corrupted filesystem\r\n");
         return -1;
     }
 
-    /* Preallocate slot. */
+    /* Предварительно зарезервировать слот. */
     _slot_set_status(fs, &fs->write, SLOT_RESERVED);
 
-    /* Write object. */
+    /* Записать объект. */
     fs->flash->program(_slot_address(fs, &fs->write) + sizeof(struct slot_header),
             object, fs->object_size);
 
-    /* Commit write. */
+    /* Зафиксировать запись. */
     _slot_set_status(fs, &fs->write, SLOT_VALID);
 
-    /* Advance the write head. */
+    /* Продвинуть головку записи. */
     _loc_advance_slot(fs, &fs->write);
 
     return 0;
@@ -403,7 +405,7 @@ int ringfs_append(struct ringfs *fs, const void *object)
 
 int ringfs_fetch(struct ringfs *fs, void *object)
 {
-    /* Advance forward in search of a valid slot. */
+    /* Двигаться вперёд в поисках валидного слота. */
     while (!_loc_equal(&fs->cursor, &fs->write)) {
         uint32_t status;
 
@@ -450,7 +452,7 @@ void ringfs_dump(FILE *stream, struct ringfs *fs)
     for (int sector=0; sector<fs->flash->sector_count; sector++) {
         int addr = _sector_address(fs, sector);
 
-        /* Read sector header. */
+        /* Чтение заголовка сектора. */
         struct sector_header header;
         fs->flash->read(addr, &header, sizeof(header));
 

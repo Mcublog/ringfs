@@ -83,9 +83,9 @@ static ssize_t op_read(uint32_t address, void *data, size_t size)
 }
 
 /*
- * A really small filesystem: 3 slots per sector, 15 slots total.
- * Has the benefit of causing frequent wraparounds, potentially finding
- * more bugs.
+ * Очень маленькая файловая система: 3 слота на сектор, всего 15 слотов.
+ * Преимущество — частые переносы кольца, что потенциально выявляет больше
+ * ошибок.
  */
 static const struct ringfs_flash_partition flash = {
     .sector_size = 32,
@@ -150,39 +150,39 @@ START_TEST(test_ringfs_scan)
 {
     printf("# test_ringfs_scan\n");
 
-    /* first format a filesystem */
+    /* сначала отформатируем файловую систему */
     struct ringfs fs1;
     printf("## ringfs_init()\n");
     ringfs_init(&fs1, &flash, DEFAULT_VERSION, sizeof(object_t));
     printf("## ringfs_format()\n");
     ringfs_format(&fs1);
 
-    /* now try to scan it */
+    /* теперь попробуем просканировать её */
     struct ringfs fs2;
     printf("## ringfs_init()\n");
     ringfs_init(&fs2, &flash, DEFAULT_VERSION, sizeof(object_t));
     printf("## ringfs_scan()\n");
     ck_assert(ringfs_scan(&fs2) == 0);
 
-    /* this is an empty FS, should start with this: */
+    /* это пустая ФС, должна начинаться так: */
     ck_assert_int_eq(fs2.slots_per_sector, (flash.sector_size-SECTOR_HEADER_SIZE)/(SLOT_HEADER_SIZE+sizeof(object_t)));
     assert_loc_equiv_to_offset(&fs2, &fs2.read, 0);
     assert_loc_equiv_to_offset(&fs2, &fs2.cursor, 0);
     assert_loc_equiv_to_offset(&fs2, &fs2.write, 0);
 
-    /* now insert some objects */
+    /* теперь добавим несколько объектов */
     ck_assert(ringfs_append(&fs2, (int[]) { 0x11 }) == 0);
     ck_assert(ringfs_append(&fs2, (int[]) { 0x22 }) == 0);
     ck_assert(ringfs_append(&fs2, (int[]) { 0x33 }) == 0);
 
-    /* rescan */
+    /* повторное сканирование */
     printf("## ringfs_scan()\n");
     ck_assert(ringfs_scan(&fs2) == 0);
 
-    /* make sure the objects are there */
+    /* убедимся, что объекты на месте */
     ck_assert(ringfs_count_exact(&fs2) == 3);
 
-    /* scan should fail if we supply a different version */
+    /* scan должен завершиться ошибкой при другой версии */
     struct ringfs fs3;
     printf("## ringfs_init()\n");
     ringfs_init(&fs3, &flash, DEFAULT_VERSION+1, sizeof(object_t));
@@ -195,7 +195,7 @@ START_TEST(test_ringfs_append)
 {
     printf("# test_ringfs_append\n");
 
-    /* first format a filesystem */
+    /* сначала отформатируем файловую систему */
     int obj;
     struct ringfs fs;
     printf("## ringfs_init()\n");
@@ -203,7 +203,7 @@ START_TEST(test_ringfs_append)
     printf("## ringfs_format()\n");
     ringfs_format(&fs);
 
-    /* fetches before appends should not change anything */
+    /* fetch до append не должен ничего менять */
     for (int i=0; i<3; i++) {
         printf("## ringfs_fetch()\n");
         ck_assert(ringfs_fetch(&fs, &obj) < 0);
@@ -213,33 +213,33 @@ START_TEST(test_ringfs_append)
     assert_loc_equiv_to_offset(&fs, &fs.cursor, 0);
     assert_scan_integrity(&fs);
 
-    /* now we're brave and we write some data */
+    /* теперь мы осмелели и пишем данные */
     for (int i=0; i<3; i++) {
         printf("## ringfs_append()\n");
         ringfs_append(&fs, (int[]) { 0x11*(i+1) });
 
-        /* make sure the write head has advanced */
+        /* убедимся, что головка записи продвинулась */
         assert_loc_equiv_to_offset(&fs, &fs.write, i+1);
         assert_scan_integrity(&fs);
     }
 
-    /* now we fetch at it. */
+    /* теперь извлекаем объекты. */
     for (int i=0; i<3; i++) {
         printf("## ringfs_fetch()\n");
         ck_assert(ringfs_fetch(&fs, &obj) == 0);
         ck_assert_int_eq(obj, 0x11*(i+1));
 
-        /* make sure the cursor head has advanced */
+        /* убедимся, что курсор продвинулся */
         assert_loc_equiv_to_offset(&fs, &fs.cursor, i+1);
     }
-    /* there should be no data left */
+    /* данных остаться не должно */
     ck_assert(ringfs_fetch(&fs, &obj) < 0);
 
-    /* test the rewind. */
+    /* проверяем перемотку. */
     ck_assert(ringfs_rewind(&fs) == 0);
     assert_loc_equiv_to_offset(&fs, &fs.cursor, 0);
 
-    /* try to read the objects once again. */
+    /* попробуем прочитать объекты ещё раз. */
     for (int i=0; i<3; i++) {
         printf("## ringfs_fetch()\n");
         ck_assert(ringfs_fetch(&fs, &obj) == 0);
@@ -258,34 +258,34 @@ START_TEST(test_ringfs_discard)
     printf("## ringfs_format()\n");
     ringfs_format(&fs);
 
-    /* write some records */
+    /* запишем несколько записей */
     for (int i=0; i<4; i++) {
         printf("## ringfs_append()\n");
         ringfs_append(&fs, (int[]) { 0x11*(i+1) });
         assert_scan_integrity(&fs);
     }
-    /* read some of them */
+    /* прочитаем некоторые из них */
     int obj;
     for (int i=0; i<2; i++) {
         printf("## ringfs_fetch()\n");
         ck_assert(ringfs_fetch(&fs, &obj) == 0);
         ck_assert_int_eq(obj, 0x11*(i+1));
     }
-    /* discard whatever was read */
+    /* сбросить прочитанное */
     ck_assert(ringfs_discard(&fs) == 0);
     assert_scan_integrity(&fs);
-    /* make sure we're consistent */
+    /* убедимся в согласованности */
     assert_loc_equiv_to_offset(&fs, &fs.read, 2);
     assert_loc_equiv_to_offset(&fs, &fs.cursor, 2);
     assert_loc_equiv_to_offset(&fs, &fs.write, 4);
 
-    /* read the rest of the records */
+    /* прочитаем остальные записи */
     for (int i=2; i<4; i++) {
         printf("## ringfs_fetch()\n");
         ck_assert(ringfs_fetch(&fs, &obj) == 0);
         ck_assert_int_eq(obj, 0x11*(i+1));
     }
-    /* discard them */
+    /* сбросим их */
     ck_assert(ringfs_discard(&fs) == 0);
     assert_loc_equiv_to_offset(&fs, &fs.read, 4);
     assert_loc_equiv_to_offset(&fs, &fs.cursor, 4);
@@ -382,8 +382,9 @@ START_TEST(test_ringfs_overflow)
     ringfs_init(&fs, &flash, DEFAULT_VERSION, sizeof(object_t));
     ringfs_format(&fs);
 
-    /* ringfs_capacity() is the declared safe capacity; the physical hard limit
-     * is one sector more. Exercise eviction at the hard limit. */
+    /* ringfs_capacity() — это объявленная безопасная ёмкость; физический
+     * жёсткий предел на один сектор больше. Проверяем вытеснение на жёстком
+     * пределе. */
     int capacity = ringfs_capacity(&fs) + fs.slots_per_sector;
 
     printf("## fill filesystem to the brim\n");
@@ -392,11 +393,11 @@ START_TEST(test_ringfs_overflow)
     ck_assert_int_eq(ringfs_count_exact(&fs), capacity);
     assert_scan_integrity(&fs);
 
-    /* won't hurt to stress it a little bit! */
+    /* не помешает немного нагрузить его! */
     for (int round=0; round<3; round++) {
         printf("## add one more object\n");
         ringfs_append(&fs, (int[]) { 0x42 });
-        /* should kill one entire sector to make space */
+        /* должен освободить целый сектор, чтобы освободить место */
         ck_assert_int_eq(ringfs_count_exact(&fs), capacity - fs.slots_per_sector + 1);
         assert_scan_integrity(&fs);
 
