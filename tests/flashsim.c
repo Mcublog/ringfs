@@ -45,7 +45,8 @@ struct flashsim *flashsim_open(const char *name, int size, int sector_size)
         logprintf("create new file: %s", name);
         sim->fh = fopen(name, kCreateMode);
         assert(sim->fh != NULL);
-        assert(ftruncate(fileno(sim->fh), size) == 0);
+        int ftr_rc = ftruncate(fileno(sim->fh), size);
+        assert(ftr_rc == 0);
     }
     assert(sim->fh != NULL);
     return sim;
@@ -65,16 +66,20 @@ void flashsim_sector_erase(struct flashsim *sim, uint32_t addr)
     void *empty = malloc(sim->sector_size);
     memset(empty, 0xff, sim->sector_size);
 
-    assert(fseek(sim->fh, sector_start, SEEK_SET) == 0);
-    assert(fwrite(empty, 1, sim->sector_size, sim->fh) == (size_t) sim->sector_size);
+    int rc = fseek(sim->fh, sector_start, SEEK_SET);
+    assert(rc == 0);
+    size_t written = fwrite(empty, 1, sim->sector_size, sim->fh);
+    assert(written == (size_t) sim->sector_size);
 
     free(empty);
 }
 
 void flashsim_read(struct flashsim *sim, uint32_t addr, uint8_t *buf, int len)
 {
-    assert(fseek(sim->fh, addr, SEEK_SET) == 0);
-    assert(fread(buf, 1, len, sim->fh) == (size_t) len);
+    int rc = fseek(sim->fh, addr, SEEK_SET);
+    assert(rc == 0);
+    size_t nread = fread(buf, 1, len, sim->fh);
+    assert(nread == (size_t) len);
 
     logprintf("flashsim_read   (0x%08x) = %d bytes [ ", addr, len);
     for (int i=0; i<len; i++) {
@@ -101,14 +106,18 @@ void flashsim_program(struct flashsim *sim, uint32_t addr, const uint8_t *buf, i
 
     uint8_t *data = malloc(len);
 
-    assert(fseek(sim->fh, addr, SEEK_SET) == 0);
-    assert(fread(data, 1, len, sim->fh) == (size_t) len);
+    int rc = fseek(sim->fh, addr, SEEK_SET);
+    assert(rc == 0);
+    size_t nread = fread(data, 1, len, sim->fh);
+    assert(nread == (size_t) len);
 
     for (int i=0; i<(int) len; i++)
         data[i] &= buf[i];
 
-    assert(fseek(sim->fh, addr, SEEK_SET) == 0);
-    assert(fwrite(data, 1, len, sim->fh) == (size_t) len);
+    rc = fseek(sim->fh, addr, SEEK_SET);
+    assert(rc == 0);
+    size_t written = fwrite(data, 1, len, sim->fh);
+    assert(written == (size_t) len);
 
     /* Нужно корректно сбросить данные в файл */
     fflush(sim->fh);
