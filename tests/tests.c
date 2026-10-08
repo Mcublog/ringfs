@@ -97,6 +97,28 @@ static const struct ringfs_flash_partition flash = {
     .read = op_read,
 };
 
+/* Минимальный раздел: 2 сектора (после снижения MIN_SECTOR_COUNT). */
+static const struct ringfs_flash_partition flash_2sectors = {
+    .sector_size = 32,
+    .sector_offset = 4,
+    .sector_count = 2,
+
+    .sector_erase = op_sector_erase,
+    .program = op_program,
+    .read = op_read,
+};
+
+/* Непригодный раздел: 1 сектор — ringfs_init() должен его отклонить. */
+static const struct ringfs_flash_partition flash_1sector = {
+    .sector_size = 32,
+    .sector_offset = 4,
+    .sector_count = 1,
+
+    .sector_erase = op_sector_erase,
+    .program = op_program,
+    .read = op_read,
+};
+
 static void fixture_flashsim_setup(void)
 {
     sim = flashsim_open("tests/ringfs.sim",
@@ -411,6 +433,63 @@ START_TEST(test_ringfs_overflow)
 }
 END_TEST
 
+START_TEST(test_ringfs_min_partition)
+{
+    printf("# test_ringfs_min_partition\n");
+
+    struct ringfs fs;
+
+    printf("## one-sector partition must be rejected\n");
+    ck_assert_int_eq(ringfs_init(&fs, &flash_1sector, DEFAULT_VERSION, sizeof(object_t)), -1);
+
+    printf("## two-sector partition must be accepted\n");
+    ck_assert_int_eq(ringfs_init(&fs, &flash_2sectors, DEFAULT_VERSION, sizeof(object_t)), 0);
+
+    int slots_per_sector = fs.slots_per_sector;
+    int capacity = ringfs_capacity(&fs);
+    /* Гибридная формула: 2 сектора — физический предел (count-1)*slots. */
+    ck_assert_int_eq(capacity, slots_per_sector);
+
+    printf("## format\n");
+    ck_assert_int_eq(ringfs_format(&fs), 0);
+    ck_assert_int_eq(ringfs_count_exact(&fs), 0);
+    ck_assert_int_eq(ringfs_count_estimate(&fs), 0);
+    assert_scan_integrity(&fs);
+
+    printf("## fill to capacity\n");
+    for (int i=0; i<capacity; i++)
+        ck_assert_int_eq(ringfs_append(&fs, (int[]) { 0x11*(i+1) }), 0);
+    ck_assert_int_eq(ringfs_count_exact(&fs), capacity);
+    ck_assert_int_eq(ringfs_count_estimate(&fs), capacity);
+    assert_scan_integrity(&fs);
+
+    printf("## one more append must evict the whole sector\n");
+    ck_assert_int_eq(ringfs_append(&fs, (int[]) { 0x44 }), 0);
+    ck_assert_int_eq(ringfs_count_exact(&fs), capacity - slots_per_sector + 1);
+    ck_assert_int_eq(ringfs_count_estimate(&fs), capacity - slots_per_sector + 1);
+    assert_scan_integrity(&fs);
+
+    printf("## fetch the surviving object\n");
+    int obj;
+    ck_assert_int_eq(ringfs_fetch(&fs, &obj), 0);
+    ck_assert_int_eq(obj, 0x44);
+    ck_assert(ringfs_fetch(&fs, &obj) < 0);
+
+    printf("## eviction rounds keep counts sane\n");
+    for (int round=0; round<3; round++) {
+        for (int i=0; i<capacity+1; i++) {
+            ck_assert_int_eq(ringfs_append(&fs, (int[]) { 0x66 }), 0);
+            ck_assert(ringfs_count_exact(&fs) <= capacity);
+            ck_assert_int_eq(ringfs_count_estimate(&fs), ringfs_count_exact(&fs));
+            assert_scan_integrity(&fs);
+        }
+        while (ringfs_fetch(&fs, &obj) == 0);
+        ck_assert_int_eq(ringfs_discard(&fs), 0);
+        ck_assert_int_eq(ringfs_count_exact(&fs), 0);
+    }
+}
+END_TEST
+
 Suite *ringfs_suite(void)
 {
     Suite *s = suite_create ("ringfs");
@@ -429,6 +508,7 @@ Suite *ringfs_suite(void)
     tcase_add_test(tc, test_ringfs_capacity);
     tcase_add_test(tc, test_ringfs_count);
     tcase_add_test(tc, test_ringfs_overflow);
+    tcase_add_test(tc, test_ringfs_min_partition);
     suite_add_tcase(s, tc);
 
     return s;

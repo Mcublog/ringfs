@@ -31,11 +31,17 @@
 #define SECTOR_FORMATTING (0x00000000U) /**< Форматируется весь раздел. */
 
 /** Минимальное число секторов, необходимое для безопасной работы RingFS.
- * - 1 сектор для головки чтения
- * - 1 сектор для операций записи
- * - 1 сектор, который всегда должен оставаться свободным (FREE, инвариант)
+ * - 1 сектор для операций записи (в нём же временно живут данные);
+ * - 1 сектор, который всегда должен оставаться свободным (FREE, инвариант).
+ * Отдельный сектор для головки чтения не нужен: она указывает внутрь
+ * секторов с данными.
+ *
+ * Один сектор непригоден: вытеснение стёрло бы сам сектор записи
+ * (next_sector == write.sector), а ringfs_scan() зациклился бы, пропуская
+ * занятые слоты (переход на «следующий сектор» возвращался бы в тот же
+ * сектор) и не нашёл бы обязательный FREE-сектор.
  */
-#define MIN_SECTOR_COUNT 3
+#define MIN_SECTOR_COUNT 2
 
 struct sector_header {
     uint32_t status;
@@ -316,10 +322,16 @@ int ringfs_capacity(const struct ringfs *fs)
      * Примечание: физический жёсткий предел на один сектор больше
      * ((count-1)*slots), но хранение сверх объявленной ёмкости при следующем
      * append вызывает немедленное вытеснение целого сектора.
+     *
+     * Исключение — минимальный раздел (2 сектора): запасного сектора нет,
+     * поэтому ёмкость равна физическому пределу (count-1)*slots, и первый
+     * же append после её заполнения вытесняет целый сектор.
      */
-    if (fs->flash->sector_count < MIN_SECTOR_COUNT)
+    int sector_count = fs->flash->sector_count;
+    if (sector_count < MIN_SECTOR_COUNT)
         return 0;
-    return fs->slots_per_sector * (fs->flash->sector_count - 2);
+    int reserved = (sector_count > MIN_SECTOR_COUNT) ? 2 : 1;
+    return fs->slots_per_sector * (sector_count - reserved);
 }
 
 int ringfs_count_estimate(const struct ringfs *fs)

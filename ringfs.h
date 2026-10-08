@@ -90,6 +90,8 @@ extern "C"
      * @param version Версия объектов. Следует увеличивать при любом
      *                обратно-несовместимом изменении семантики или размера.
      * @param object_size Размер одного хранимого объекта, в байтах.
+     * @note Раздел должен содержать минимум 2 сектора; при меньшем размере
+     *       возвращается -1.
      * @returns Ноль при успехе, -1 при ошибке.
      */
     int ringfs_init(struct ringfs *fs, const struct ringfs_flash_partition *flash,
@@ -115,7 +117,10 @@ extern "C"
      * Вычисляет максимальную ёмкость RingFS.
      *
      * @param fs Инициализированный экземпляр RingFS.
-     * @returns Максимальная ёмкость; 0 при некорректном разделе.
+     * @returns Максимальная ёмкость; 0 при некорректном разделе. Для
+     *          минимального раздела (2 сектора) — физический предел
+     *          (sector_count - 1) * slots_per_sector; иначе
+     *          (sector_count - 2) * slots_per_sector.
      */
     int ringfs_capacity(const struct ringfs *fs);
 

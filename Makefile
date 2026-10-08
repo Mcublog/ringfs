@@ -5,7 +5,7 @@
 # published by Sam Hocevar. See the COPYING file for more details.
 
 CFLAGS = -g -Wall -Wextra -Werror -std=c99 -D_POSIX_C_SOURCE=200809L -fPIC -I. -Itests
-LDLIBS = -lcheck
+LDLIBS = $(shell pkg-config --libs check 2>/dev/null || echo -lcheck -lm -lsubunit -lrt)
 
 all: scan-build test example
 	@echo "+++ All good."""
@@ -31,7 +31,8 @@ docs:
 	doxygen
 
 clean:
-	$(RM) *.o tests/*.o tests/tests html/ *.sim tags example
+	$(RM) *.o tests/*.o tests/tests *.sim tags example
+	$(RM) -r html
 
 %.so: %.o
 	$(LINK.o) -shared $^ $(LOADLIBES) -o $@

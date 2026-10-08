@@ -89,9 +89,9 @@ class FuzzRun(object):
 
 
 sector_size = random.randint(16, 256)
-total_sectors = random.randint(3, 8)
-sector_offset = random.randint(0, total_sectors-3)
-sector_count = random.randint(3, total_sectors-sector_offset)
+total_sectors = random.randint(2, 8)
+sector_offset = random.randint(0, total_sectors-2)
+sector_count = random.randint(2, total_sectors-sector_offset)
 version = random.randint(0, 0xffffffff)
 # object_size должен оставлять место для заголовков сектора и слота в одном
 # слоте: slots_per_sector = (sector_size-8)/(object_size+4) >= 1
